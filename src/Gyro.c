@@ -1,4 +1,4 @@
-const tSensors GyroSensor = (tSensors) S2;
+const tSensors GyroSensor = (tSensors) S4;
 #define GYRO_BIAS 596
 #define SMOOTH_WINDOW 5
 #define BIAS_WINDOW 10000
