@@ -1,6 +1,25 @@
 // Driver functions for the NXT Mindstorm robot
 // Note that all values are assumed motors A and B are connected, and A is the master motor
 
+// Global Declarations & Defines
+#DEFINE CONTROLLERFREQUENCY 10
+#DEFINE MILLTOKG 10000000
+#DEFINE G 981
+
+#DEFINE SONAR S1
+#DEFINE GYRO S4
+
+
+// Function Prototypes
+void setupDefault (void);
+void moveSpeed (int motorSpeed);
+
+int encoderValue(void);
+int sensorValue(string sensorNumber);
+
+long disDerivative (long x1, long x2, int deltaT);
+long disIntegral (long x1, long x2, int deltaT);
+
 
 // Reset all values to desired defaults
 void setupDefault (void) {
@@ -22,9 +41,26 @@ void setupDefault (void) {
 
 }
 
+// Computes the discrete derivative of a function using integer mathematics
+	// x1 - The value x[n-1]
+	// x2 - The value x[n]
+	// deltaT - The period T in seconds
+long disDerivative (long x1, long x2, int deltaT){
+	return ((x2 - x1)/deltaT);
+}
+
+// Computes the discrete integral of a function using integer mathematics
+	// x1 - The value x[n-1]
+	// x2 - The value x[n]
+	// deltaT - The period T in seconds
+long disIntegral (long x1, long x2, int deltaT){
+	return ((x2 - x1)*deltaT);
+}
+
+
 // Converts a given torque to a desired speed
 	// toque - given torque (in N.m)
-int torqueToSpeed (int torque){
+long torqueToSpeed (long torque){
 
 
 }
