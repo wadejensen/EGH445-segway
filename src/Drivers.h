@@ -2,9 +2,10 @@
 // Note that all values are assumed motors A and B are connected, and A is the master motor
 
 // Global Declarations & Defines
-#DEFINE CONTROLLERFREQUENCY 10
+#DEFINE CONTROLLERFREQUENCY 290
 #DEFINE MILLTOKG 10000000
 #DEFINE G 981
+#DEFINE MAXSPEED 0
 
 #DEFINE SONAR S1
 #DEFINE GYRO S4
@@ -17,8 +18,8 @@ void moveSpeed (int motorSpeed);
 int encoderValue(void);
 int sensorValue(string sensorNumber);
 
-long disDerivative (long x1, long x2, int deltaT);
-long disIntegral (long x1, long x2, int deltaT);
+float disDerivative (long x1, long x2, int deltaT);
+float disIntegral (long x1, long x2, int deltaT);
 
 
 // Reset all values to desired defaults
@@ -45,7 +46,7 @@ void setupDefault (void) {
 	// x1 - The value x[n-1]
 	// x2 - The value x[n]
 	// deltaT - The period T in seconds
-long disDerivative (long x1, long x2, int deltaT){
+float disDerivative (float x1, float x2, int deltaT){
 	return ((x2 - x1)/deltaT);
 }
 
@@ -53,16 +54,31 @@ long disDerivative (long x1, long x2, int deltaT){
 	// x1 - The value x[n-1]
 	// x2 - The value x[n]
 	// deltaT - The period T in seconds
-long disIntegral (long x1, long x2, int deltaT){
+float disIntegral (float x1, float x2, int deltaT){
 	return ((x2 - x1)*deltaT);
 }
 
 
 // Converts a given torque to a desired speed
 	// toque - given torque (in N.m)
-long torqueToSpeed (long torque){
+float torqueToSpeed (float torque){
+	int pidPercentage = 0;
+	float velocity = 0;		// IS THIS A LINEAR VELO OR ANGULAR VELO?
 
 
+	// Convert torque to velocity and scale to a percentage of maximum motor speed
+	velocity = 
+	pidPercentage = (velocity * 100) / MAXSPEED
+
+	// Limit motor speed to maximum
+		if (pidPercentage > 100) {
+			pidPercentage = 100;
+		}
+		else if (pidPercentage < -100){
+			pidPercentage = -100;
+		}
+
+	return pidPercentage;
 }
 
 
