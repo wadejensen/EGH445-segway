@@ -3,9 +3,12 @@
 
 // Global Declarations & Defines
 #DEFINE CONTROLLERFREQUENCY 290
+#DEFINE SAMPLEPERIOD 0.003448
 #DEFINE MILLTOKG 10000000
 #DEFINE G 981
-#DEFINE MAXSPEED 0
+// About 700-710 ticks per second at 100%
+#DEFINE MAXSPEED 700
+
 
 #DEFINE SONAR S1
 #DEFINE GYRO S4
@@ -18,9 +21,7 @@ void moveSpeed (int motorSpeed);
 int encoderValue(void);
 int sensorValue(string sensorNumber);
 
-float disDerivative (long x1, long x2, int deltaT);
-float disIntegral (long x1, long x2, int deltaT);
-
+float torqueToSpeed (float torque, float inertia);
 
 // Reset all values to desired defaults
 void setupDefault (void) {
@@ -38,36 +39,35 @@ void setupDefault (void) {
 	nMotorPIDSpeedCtrl[motorC] = mtrSyncRegSlave;
 
 	//Turn Sensors on (if needed)
-	SetSensorType(S1, sensorSONAR);
+	//SetSensorType(S1, sensorSONAR);
 
 }
 
-// Computes the discrete derivative of a function using integer mathematics
-	// x1 - The value x[n-1]
-	// x2 - The value x[n]
-	// deltaT - The period T in seconds
-float disDerivative (float x1, float x2, int deltaT){
-	return ((x2 - x1)/deltaT);
-}
+// // Computes the discrete derivative of a function using integer mathematics
+// 	// x1 - The value x[n-1]
+// 	// x2 - The value x[n]
+// 	// deltaT - The period T in seconds
+// float disDerivative (float x1, float x2, int deltaT){
+// 	return ((x2 - x1)/deltaT);
+// }
 
-// Computes the discrete integral of a function using integer mathematics
-	// x1 - The value x[n-1]
-	// x2 - The value x[n]
-	// deltaT - The period T in seconds
-float disIntegral (float x1, float x2, int deltaT){
-	return ((x2 - x1)*deltaT);
-}
+// // Computes the discrete integral of a function using integer mathematics
+// 	// x1 - The value x[n-1]
+// 	// x2 - The value x[n]
+// 	// deltaT - The period T in seconds
+// float disIntegral (float x1, float x2, int deltaT){
+// 	return ((x2 - x1)*deltaT);
+// }
 
 
 // Converts a given torque to a desired speed
 	// toque - given torque (in N.m)
-float torqueToSpeed (float torque){
+float torqueToSpeed (float torque, float inertia){
 	int pidPercentage = 0;
 	float velocity = 0;		// IS THIS A LINEAR VELO OR ANGULAR VELO?
 
-
 	// Convert torque to velocity and scale to a percentage of maximum motor speed
-	velocity = 
+	velocity = (torque/inertia) * SAMPLEPERIOD;
 	pidPercentage = (velocity * 100) / MAXSPEED
 
 	// Limit motor speed to maximum
@@ -90,32 +90,32 @@ void moveSpeed (int motorSpeed){
 }
 
 
-// Moves the motors to a specified angle
-	// degreeMove - what angle to move to, in degrees
-	// motorSpeed - what speed to set the motor (positive speeds only)
-void moveToAngle (int degreeMove, int motorSpeed) {
-	if (nMotorEncoder[motorA]<degreeMove){
-		while(nMotorEncoder[motorA]<degreeMove){
-			motor[motorA] = motorPower;
-		}
-	}
-	else{
-		while(nMotorEncoder[motorA]>degreeMove){
-			motor[motorA] = motorPower * -1;
-		}		
-	}
-	return;
-}
+// // Moves the motors to a specified angle
+// 	// degreeMove - what angle to move to, in degrees
+// 	// motorSpeed - what speed to set the motor (positive speeds only)
+// void moveToAngle (int degreeMove, int motorSpeed) {
+// 	if (nMotorEncoder[motorA]<degreeMove){
+// 		while(nMotorEncoder[motorA]<degreeMove){
+// 			motor[motorA] = motorPower;
+// 		}
+// 	}
+// 	else{
+// 		while(nMotorEncoder[motorA]>degreeMove){
+// 			motor[motorA] = motorPower * -1;
+// 		}		
+// 	}
+// 	return;
+// }
 
 
-// Moves the motors relative to the current angle
-	// degreeMove - what relative angle to move
-	// motorSpeed - what speed to set the motor (positive speeds only)
-void moveToRelative (int relativeMove, int motorSpeed) {
-	int desiredAngle = nMotorEncoder[motorA] + relativeMove;
-	moveToAngle(desiredAngle, motorPower);
-	return;
-}
+// // Moves the motors relative to the current angle
+// 	// degreeMove - what relative angle to move
+// 	// motorSpeed - what speed to set the motor (positive speeds only)
+// void moveToRelative (int relativeMove, int motorSpeed) {
+// 	int desiredAngle = nMotorEncoder[motorA] + relativeMove;
+// 	moveToAngle(desiredAngle, motorPower);
+// 	return;
+// }
 
 
 

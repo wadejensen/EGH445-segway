@@ -11,15 +11,10 @@ task main()
 
 
 	moveSpeed(100);
-
-
-
-
-
-	wait1Msec(2000);
-	moveSpeed(0);		//Double check this does a hard break
+	wait1Msec(1000);
 	encoderEnd = nMotorEncoder[motorA];
-	// Maybe actually do a calculation to return speed here? - or otherwise return encoder ticks per second
+	moveSpeed(0);		//Double check this does a hard break
+	
 	nxtDisplayTextLine(3, " MotorAStart: %05.2f ", encoderStart);
 	nxtDisplayTextLine(6, " MotorAEnd: %05.2f ", enencoderEnd);
 	wait1Msec(5000);
@@ -45,7 +40,6 @@ void setupDefault (void) {
 }
 
 void moveSpeed (int motorSpeed){
-	//TODO: check if the speed can be a negative percentage, or if I need to set the direction to reverse, and if motors stay synched
 	motor[motorA] = motorSpeed;
 	return;
 }
