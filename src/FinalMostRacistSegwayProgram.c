@@ -36,7 +36,7 @@ task main()
 	// Run Setup Script
 	setupDefault();
 
-	// Variable Declarations 
+	// Variable Declarations
 	float massRobot = 0.543100;			// Mass in milligrams (x10^6, use kg)
 	float massWheel = 0.035830;			// Mass in milligrams (x10^6, use kg)
 	float inertiaWheel = 7.022700;		// Intertia in kg.m^2 (x10^6, use kg.m^2)
@@ -46,15 +46,15 @@ task main()
 	// TODO: - gyro gives a velocity, so really just need to multiply the velocity by the time sample, may not actually need the previous sample - same maybe with motor encoders?
 	// For displacement, angle = previous angle + velocity * time
 
-	float angleVelocityPrevious = 0;			
-	float angleVelocityCurrent = 0;			
+	float angleVelocityPrevious = 0;
+	float angleVelocityCurrent = 0;
 
 	float angleDisplacementPrevious = 0;	//MAY NOT BE NEEDED
 	float angleDisplacementCurrent = 0;
 
 	int encoderValuePrevious = 0;
 	int encoderValueCurrent = 0;
-	int motorAngle = 0;				
+	int motorAngle = 0;
 	float linearDisplacementPrevious = 0;
 	float linearDisplacementCurrent = 0;
 
@@ -89,7 +89,8 @@ task main()
 		//DEBUG:
 
 
-		// Compute state variables - TODO: theta is accumilating
+		// Compute state variables - TODO: theta is accumilating - due to drift - should I maybe average a number of samples to get a more accurate reading?
+		// Are we running into the maximum gyroscope reading on either side - range seems to be between 0 and 975, centred at 565 - lower range appears larger than higher range?
 		angleVelocityCurrent = SensorValue(S4) - GYROFFSET;
 		angleDisplacementCurrent = angleDisplacementCurrent + (angleVelocityCurrent) * SAMPLEPERIOD;			// TODO: - may need to do integer mathematics here depending on if this derivative is a fraction with small number
 																													// TODO: - is it more accurate to go current velocity - previous velocity = displacement? - or how do discrete integrals work again?
@@ -112,7 +113,7 @@ task main()
 		motorTorque = (L1 * -14.8576) + (L2 * -1.5143) + (L3 * -10) + (L4 * -6.5144);
 
 		// Compute velocity command
-		pidPercentage = torqueToSpeed(-motorTorque, inertiaWheel);		//TODO: is motor torque meant to be negative?
+		pidPercentage = torqueToSpeed(motorTorque, inertiaWheel);		//Motor torque should make robot move in the same direction as it is tilting 
 		moveSpeed(pidPercentage);
 
 		//DEBUG: Display State Variables

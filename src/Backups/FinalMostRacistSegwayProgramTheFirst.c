@@ -84,11 +84,8 @@ task main()
 
 
 
-		// Read sensor values
-		encoderValuePrevious = encoderValueCurrent;
-		encoderValueCurrent = nMotorEncoder[motorA];
-
 		// Compute state variables - TODO: theta is accumilating
+		angleVelocityPrevious = angleVelocityCurrent;
 		angleVelocityCurrent = SensorValue(S4) - GYROFFSET;
 		angleDisplacementCurrent = angleDisplacementCurrent + ((angleVelocityCurrent + angleVelocityPrevious)/2) * SAMPLEPERIOD;			// TODO: - may need to do integer mathematics here depending on if this derivative is a fraction with small number
 																													// TODO: - is it more accurate to go current velocity - previous velocity = displacement? - or how do discrete integrals work again?
