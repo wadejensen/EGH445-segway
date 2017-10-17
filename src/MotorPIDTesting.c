@@ -4,9 +4,14 @@ void moveSpeed (int motorSpeed);
 
 task main()
 {
+
 	setupDefault();
+	int encoderVal = nMotorEncoder[motorA];
 	moveSpeed(-50);
-	wait1Msec(1000);
+	wait1Msec(2000);
+	nxtDisplayTextLine(3, " First: %05.2f ", encoderVal);
+	nxtDisplayTextLine(4, " Last: %05.2f ", nMotorEncoder[motorA]);
+	wait1Msec(5000);
 
 }
 

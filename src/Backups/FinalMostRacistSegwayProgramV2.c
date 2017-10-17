@@ -7,6 +7,8 @@
  // Global Declarations & Defines
 #define  CONTROLLERFREQUENCY 290
 #define  SAMPLEPERIOD 0.003448
+#define  MILLTOKG 10000000
+#define  G 981
 // About 700-710 ticks per second at 100%
 #define  MAXSPEED 700
 #define GYROFFSET 595
@@ -35,8 +37,11 @@ task main()
 	setupDefault();
 
 	// Variable Declarations
-	float inertiaWheel = 0.000014045;		// Intertia in kg.m^2 (x10^6, use kg.m^2)
-	float wheelRadius = 0.028000;					// Radius of the wheel in um (x10^6, use m)
+	float massRobot = 0.543100;			// Mass in milligrams (x10^6, use kg)
+	float massWheel = 0.035830;			// Mass in milligrams (x10^6, use kg)
+	float inertiaWheel = 7.022700;		// Intertia in kg.m^2 (x10^6, use kg.m^2)
+	float massCentreDist = 0.080000;	// Distance from wheel to centre of mass in um (x10^6, use m)
+	float wheelRadius = 0.028000;		// Radius of the wheel in um (x10^6, use m)
 
 	// TODO: - gyro gives a velocity, so really just need to multiply the velocity by the time sample, may not actually need the previous sample - same maybe with motor encoders?
 	// For displacement, angle = previous angle + velocity * time
@@ -59,10 +64,20 @@ task main()
 	float motorTorque = 0;
 	int pidPercentage = 0;
 
-	//float L1 = 0;
-	//float L2 = 0;
-	//float L3 = 0;
-	//float L4 = 0;
+	float L1 = 0;
+	float L2 = 0;
+	float L3 = 0;
+	float L4 = 0;
+
+	//// L gain magic bullshit
+	//float c1 = 0.0083;
+	//float c2 = ;
+	//float c3 = ;
+	//float c4 = ;
+	//float c5 = ;
+	//float c6 = ;
+	//float c7 = ;
+	//float c8 = ;
 
 	//DEBUG:
 	//int timerloop = 0;
@@ -79,7 +94,6 @@ task main()
 		angleVelocityCurrent = SensorValue(S4) - GYROFFSET;
 		angleDisplacementCurrent = angleDisplacementCurrent + (angleVelocityCurrent) * SAMPLEPERIOD;			// TODO: - may need to do integer mathematics here depending on if this derivative is a fraction with small number
 																													// TODO: - is it more accurate to go current velocity - previous velocity = displacement? - or how do discrete integrals work again?
-
 		encoderValuePrevious = encoderValueCurrent;
 		encoderValueCurrent = encoderValue();
 		linearDisplacementPrevious = linearDisplacementCurrent;
@@ -91,25 +105,19 @@ task main()
 		// Estimate gains & compute control rule (L x s) . K
 		//control1 = (0.0083 * angleDisplacementCurrent + 1.7460 * angleVelocityCurrent + 0.0001 * linearDisplacementCurrent + 0.0329 * linearVelocityCurrent) * 100000;
 		//control2 = (0.0001 * angleDisplacementCurrent + 0.0466 * angleVelocityCurrent + 0.0083 * linearDisplacementCurrent + 1.7135 * linearVelocityCurrent) * 100000;
-		//L1 = (831.8732 * angleDisplacementCurrent) + (11.2053 * linearDisplacementCurrent);
-		//L2 = (176140 * angleDisplacementCurrent) + (4656.2 * linearDisplacementCurrent);
-		//L3 = (8.2434 * angleDisplacementCurrent) + (828.1268 * linearDisplacementCurrent);
-		//L4 = (3164.1 * angleDisplacementCurrent) + (171350 * linearDisplacementCurrent);
+		L1 = (831.8732 * angleDisplacementCurrent) + (11.2053 * linearDisplacementCurrent);
+		L2 = (176140 * angleDisplacementCurrent) + (4656.2 * linearDisplacementCurrent);
+		L3 = (8.2434 * angleDisplacementCurrent) + (828.1268 * linearDisplacementCurrent);
+		L4 = (3164.1 * angleDisplacementCurrent) + (171350 * linearDisplacementCurrent);
 
-		//motorTorque = (L1 * -12.9644) + (L2 * -1.4068) + (L3 * -3.1623) + (L4 * -3.3708);
-		//TODO: Tune gains below for stability and faster settling - overshoot doesn't matter so much
-		motorTorque = (angleDisplacementCurrent * (PI/180) * -4.1937) + (angleVelocityCurrent * (PI/180) * -0.4461) + (linearDisplacementCurrent * -1.0000) + (linearVelocityCurrent * -1.0678);
-	  //motorTorque = motorTorque * 0.3; //TODO - temp fix
+		motorTorque = (L1 * -14.8576) + (L2 * -1.5143) + (L3 * -10) + (L4 * -6.5144);
 
 		// Compute velocity command
 		pidPercentage = torqueToSpeed(-motorTorque, inertiaWheel);		//Motor torque should make robot move in the same direction as it is tilting
 		moveSpeed(pidPercentage);
 
-
 		//DEBUG: Display State Variables
 		 //nxtDisplayTextLine(2, " TimeLoop: %d ", (timerloop));
-		 nxtDisplayTextLine(1, " PID: %05.2f ", pidPercentage);
-		 nxtDisplayTextLine(2, " Torque: %05.2f ", motorTorque);
 		 nxtDisplayTextLine(3, " Theta: %05.2f ", angleDisplacementCurrent);
 		 nxtDisplayTextLine(4, " Thetadot: %05.2f ", angleVelocityCurrent);
 		 nxtDisplayTextLine(5, " X: %05.2f ", linearDisplacementCurrent);
@@ -147,12 +155,11 @@ void setupDefault (void) {
 // Converts a given torque to a desired speed
 	// toque - given torque (in N.m)
 float torqueToSpeed (float torque, float inertia){
-	float pidPercentage = 0;
+	int pidPercentage = 0;
 	float velocity = 0;		// IS THIS A LINEAR VELO OR ANGULAR VELO?
 
 	// Convert torque to velocity and scale to a percentage of maximum motor speed
-	velocity = (torque/inertia) * SAMPLEPERIOD;						//In rad/s
-	velocity = velocity * (180/PI);												//In ticks/s
+	velocity = (torque/inertia) * SAMPLEPERIOD;
 	pidPercentage = (velocity * 100) / MAXSPEED;
 
 	// Limit motor speed to maximum
