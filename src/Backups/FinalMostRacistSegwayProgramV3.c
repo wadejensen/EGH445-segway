@@ -1,61 +1,51 @@
-#pragma config(Sensor, S1,     HTGYRO,              sensorAnalogInactive)
 /*
  *  ======== MainCode.c ========
  * EGH445 2017
  * Author: Gerard Rallos
  */
 
-/* ============== Global Declarations & Defines ============== */
+ // Global Declarations & Defines
 #define  CONTROLLERFREQUENCY 290
 #define  SAMPLEPERIOD 0.003448
 // About 700-710 ticks per second at 100%
 #define  MAXSPEED 700
 #define GYROFFSET 595
 
-#define RANGEMAX 25.0
-#define RANGEMIN 0.0
-#define RANGEZERO 12.0
-
-#define nBar -1.0
-
 #define  SONAR S1
 #define  GYRO S4
 
+
 /* ============== Includes ============== */
-#include "drivers/hitechnic-gyro.h"
-
-
-/* ============== Function Prototypes ============== */
 void setupDefault (void);
 void moveSpeed (int motorSpeed);
 int encoderValue(void);
 float torqueToSpeed (float torque, float inertia);
 
-
-/* ============== Good K gains (DEBUG) ============== */
- 	//   -1.2627   -0.0728   -0.3162   -0.3042 --> 1, 0.001, 0.1, 0.001
- // 	 -6.3502 	 -1.1975 	 -1.0000   -1.6101 --> motor torque 0.1 multiuplier
- //		 -0.9409   -0.0532   -0.2236   -0.2164 --> 0.5, 0.0005, 0.05, 0.0005 --> best, 1/5 of this weighting is smooth but unstable
- //		 -1.0185   -0.0696   -0.5477   -0.3533 --> Drifts less, but doesn't quite seem to be as stable
-
 /*
  *  ======== Main Code Loop ========
  */
+//TODO: check about int vs long - might need to specify stuff as long and multiply everything by 10^6 so I have a constant division for everything
+// Could probably do everything as floating point and if it becomes a problem do integer arithmetic?
 
+ // GOOD K GAINS:
+ 	//   -1.2627   -0.0728   -0.3162   -0.3042 --> 1, 0.001, 0.1, 0.001
+ // 	 -6.3502 	 -1.1975 	 -1.0000   -1.6101 --> motor torque 0.1 multiuplier
+ //		 -0.9409   -0.0532   -0.2236   -0.2164 --> 0.5, 0.0005, 0.05, 0.0005 --> best, 1/5 of this weighting is smooth but unstable
+
+
+// May need to run different tasks, depends if necessary or not - e.g. task that just reads sensor values - also can probably reduce memory size by removing a lot of uneeded variables and simplifying expressions - at the moment this emphasizes readability
 task main()
 {
-	//======== Gyroscope Calibration ========
-	nxtDisplayTextLine(2, "Offset: %f", HTGYROstartCal(HTGYRO));			//TODO: maybe fix this calibration later - add the actual offset value
-	nxtDisplayTextLine(2, "CALIBRATION FINISHED");
- 	wait1Msec(5000);
-
-	//======== Main Code  ========
 	// Run Setup Script
 	setupDefault();
 
 	// Variable Declarations
 	float inertiaWheel = 0.000014045;		// Intertia in kg.m^2 (x10^6, use kg.m^2)
 	float wheelRadius = 0.028000;					// Radius of the wheel in um (x10^6, use m)
+
+	// TODO: - gyro gives a velocity, so really just need to multiply the velocity by the time sample, may not actually need the previous sample - same maybe with motor encoders?
+	// For displacement, angle = previous angle + velocity * time
+
 	float angleVelocityPrevious = 0;
 	float angleVelocityCurrent = 0;
 
@@ -64,7 +54,7 @@ task main()
 
 	int encoderValuePrevious = 0;
 	int encoderValueCurrent = 0;
-
+	int motorAngle = 0;
 	float linearDisplacementPrevious = 0;
 	float linearDisplacementCurrent = 0;
 
@@ -74,9 +64,10 @@ task main()
 	float motorTorque = 0;
 	int pidPercentage = 0;
 
-	//Extra Feature: Range sensor
-	float rangeValue = 0;
-	float overshootCorrection = 0;
+	//float L1 = 0;
+	//float L2 = 0;
+	//float L3 = 0;
+	//float L4 = 0;
 
 	//DEBUG:
 	//int timerloop = 0;
@@ -88,9 +79,11 @@ task main()
 		//DEBUG:
 
 
-		// Compute state variables
+		// Compute state variables - TODO: theta is accumilating - due to drift - should I maybe average a number of samples to get a more accurate reading?
+		// Are we running into the maximum gyroscope reading on either side - range seems to be between 0 and 975, centred at 565 - lower range appears larger than higher range?
 		angleVelocityCurrent = SensorValue(S4) - GYROFFSET;
-		angleDisplacementCurrent = angleDisplacementCurrent + (angleVelocityCurrent) * SAMPLEPERIOD;
+		angleDisplacementCurrent = angleDisplacementCurrent + (angleVelocityCurrent) * SAMPLEPERIOD;			// TODO: - may need to do integer mathematics here depending on if this derivative is a fraction with small number
+																													// TODO: - is it more accurate to go current velocity - previous velocity = displacement? - or how do discrete integrals work again?
 
 		encoderValuePrevious = encoderValueCurrent;
 		encoderValueCurrent = encoderValue();
@@ -100,35 +93,24 @@ task main()
 		linearVelocityPrevious = linearVelocityCurrent;
 		linearVelocityCurrent = (linearDisplacementCurrent - linearDisplacementPrevious) * CONTROLLERFREQUENCY;
 
-		// Extra Feature - Range sensor offset
-		rangeValue = SensorValue(S1);															// Range reading in cm;
-		if((rangeValue >= RANGEMAX) || (rangeValue <= RANGEMIN)) {
-			rangeValue = RANGEMIN;
-		}
-		else if(rangeValue == RANGEZERO){
-			rangeValue = 0;
-	  }
+		// Estimate gains & compute control rule (L x s) . K
+		//control1 = (0.0083 * angleDisplacementCurrent + 1.7460 * angleVelocityCurrent + 0.0001 * linearDisplacementCurrent + 0.0329 * linearVelocityCurrent) * 100000;
+		//control2 = (0.0001 * angleDisplacementCurrent + 0.0466 * angleVelocityCurrent + 0.0083 * linearDisplacementCurrent + 1.7135 * linearVelocityCurrent) * 100000;
+		//L1 = (831.8732 * angleDisplacementCurrent) + (11.2053 * linearDisplacementCurrent);
+		//L2 = (176140 * angleDisplacementCurrent) + (4656.2 * linearDisplacementCurrent);
+		//L3 = (8.2434 * angleDisplacementCurrent) + (828.1268 * linearDisplacementCurrent);
+		//L4 = (3164.1 * angleDisplacementCurrent) + (171350 * linearDisplacementCurrent);
 
-		// Determine if robot should move backwards or forwards to track object
-	  //TODO: - make sure max velocity is scaled - current limits makes it go too fast - maytbe just put a flat limit on the max movement range (although it can detect further
-		if((rangeValue >= RANGEZERO) && (rangeValue <= RANGEMAX)){
-			rangeValue = (rangeValue - RANGEZERO) / 100;											// Move forward reference in meters
-		}
-		else if ((rangeValue < RANGEZERO) && (rangeValue > RANGEMIN)){
-			rangeValue = (rangeValue - RANGEZERO) / 100;										// Move backward reference in meters
-		}
-
-		// Estimate gains & compute control rule K * s
+		//motorTorque = (L1 * -12.9644) + (L2 * -1.4068) + (L3 * -3.1623) + (L4 * -3.3708);
+		//TODO: Tune gains below for stability and faster settling - overshoot doesn't matter so much
 	 // motorTorque = motorTorque * 0.1; //TODO - temp fix
-		//motorTorque = (angleDisplacementCurrent * (PI/180) * -0.9409) + (angleVelocityCurrent * (PI/180) *  -0.0532) + (linearDisplacementCurrent * -0.2236) + (linearVelocityCurrent * -0.2164);
-
-		//motorTorque = (angleDisplacementCurrent * (PI/180) * -0.9409) + (angleVelocityCurrent * (PI/180) *  -0.0532) + ((linearDisplacementCurrent) * -0.2236) + (linearVelocityCurrent * -0.2164);
-		motorTorque = (angleDisplacementCurrent * (PI/180) * -0.9409) + (angleVelocityCurrent * (PI/180) *  -0.0532) + ((linearDisplacementCurrent) * -0.2236) + (linearVelocityCurrent * -0.2164);
-		motorTorque = motorTorque + nBar * -rangeValue * 0.6;
+		//motorTorque = (angleDisplacementCurrent * (PI/180) * -1.2627) + (angleVelocityCurrent * (PI/180) * -0.0728) + (linearDisplacementCurrent * -0.3162) + (linearVelocityCurrent * -0.3042);
+		motorTorque = (angleDisplacementCurrent * (PI/180) * -0.9409) + (angleVelocityCurrent * (PI/180) *  -0.0532) + (linearDisplacementCurrent * -0.2236) + (linearVelocityCurrent * -0.2164);
 
 		// Compute velocity command
 		pidPercentage = torqueToSpeed(-motorTorque, inertiaWheel);		//Motor torque should make robot move in the same direction as it is tilting
 		moveSpeed(pidPercentage);
+
 
 		//DEBUG: Display State Variables
 		 //nxtDisplayTextLine(2, " TimeLoop: %d ", (timerloop));
@@ -138,7 +120,6 @@ task main()
 		 nxtDisplayTextLine(4, " Thetadot: %05.2f ", angleVelocityCurrent);
 		 nxtDisplayTextLine(5, " X: %05.2f ", linearDisplacementCurrent);
 		 nxtDisplayTextLine(6, " Xdot: %05.2f ", linearVelocityCurrent);
-		 nxtDisplayTextLine(7, " Range: %04.3f ", rangeValue);
 
 		wait1Msec(2);
 	}

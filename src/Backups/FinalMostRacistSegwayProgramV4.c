@@ -12,12 +12,6 @@
 #define  MAXSPEED 700
 #define GYROFFSET 595
 
-#define RANGEMAX 25.0
-#define RANGEMIN 0.0
-#define RANGEZERO 12.0
-
-#define nBar -1.0
-
 #define  SONAR S1
 #define  GYRO S4
 
@@ -64,7 +58,7 @@ task main()
 
 	int encoderValuePrevious = 0;
 	int encoderValueCurrent = 0;
-
+	int motorAngle = 0;
 	float linearDisplacementPrevious = 0;
 	float linearDisplacementCurrent = 0;
 
@@ -73,10 +67,6 @@ task main()
 
 	float motorTorque = 0;
 	int pidPercentage = 0;
-
-	//Extra Feature: Range sensor
-	float rangeValue = 0;
-	float overshootCorrection = 0;
 
 	//DEBUG:
 	//int timerloop = 0;
@@ -88,9 +78,11 @@ task main()
 		//DEBUG:
 
 
-		// Compute state variables
+		// Compute state variables - TODO: theta is accumilating - due to drift - should I maybe average a number of samples to get a more accurate reading?
+		// Are we running into the maximum gyroscope reading on either side - range seems to be between 0 and 975, centred at 565 - lower range appears larger than higher range?
 		angleVelocityCurrent = SensorValue(S4) - GYROFFSET;
-		angleDisplacementCurrent = angleDisplacementCurrent + (angleVelocityCurrent) * SAMPLEPERIOD;
+		angleDisplacementCurrent = angleDisplacementCurrent + (angleVelocityCurrent) * SAMPLEPERIOD;			// TODO: - may need to do integer mathematics here depending on if this derivative is a fraction with small number
+																													// TODO: - is it more accurate to go current velocity - previous velocity = displacement? - or how do discrete integrals work again?
 
 		encoderValuePrevious = encoderValueCurrent;
 		encoderValueCurrent = encoderValue();
@@ -100,31 +92,10 @@ task main()
 		linearVelocityPrevious = linearVelocityCurrent;
 		linearVelocityCurrent = (linearDisplacementCurrent - linearDisplacementPrevious) * CONTROLLERFREQUENCY;
 
-		// Extra Feature - Range sensor offset
-		rangeValue = SensorValue(S1);															// Range reading in cm;
-		if((rangeValue >= RANGEMAX) || (rangeValue <= RANGEMIN)) {
-			rangeValue = RANGEMIN;
-		}
-		else if(rangeValue == RANGEZERO){
-			rangeValue = 0;
-	  }
-
-		// Determine if robot should move backwards or forwards to track object
-	  //TODO: - make sure max velocity is scaled - current limits makes it go too fast - maytbe just put a flat limit on the max movement range (although it can detect further
-		if((rangeValue >= RANGEZERO) && (rangeValue <= RANGEMAX)){
-			rangeValue = (rangeValue - RANGEZERO) / 100;											// Move forward reference in meters
-		}
-		else if ((rangeValue < RANGEZERO) && (rangeValue > RANGEMIN)){
-			rangeValue = (rangeValue - RANGEZERO) / 100;										// Move backward reference in meters
-		}
-
 		// Estimate gains & compute control rule K * s
 	 // motorTorque = motorTorque * 0.1; //TODO - temp fix
 		//motorTorque = (angleDisplacementCurrent * (PI/180) * -0.9409) + (angleVelocityCurrent * (PI/180) *  -0.0532) + (linearDisplacementCurrent * -0.2236) + (linearVelocityCurrent * -0.2164);
-
-		//motorTorque = (angleDisplacementCurrent * (PI/180) * -0.9409) + (angleVelocityCurrent * (PI/180) *  -0.0532) + ((linearDisplacementCurrent) * -0.2236) + (linearVelocityCurrent * -0.2164);
-		motorTorque = (angleDisplacementCurrent * (PI/180) * -0.9409) + (angleVelocityCurrent * (PI/180) *  -0.0532) + ((linearDisplacementCurrent) * -0.2236) + (linearVelocityCurrent * -0.2164);
-		motorTorque = motorTorque + nBar * -rangeValue * 0.6;
+		motorTorque = (angleDisplacementCurrent * (PI/180) * -1.0185) + (angleVelocityCurrent * (PI/180) *  -0.0696) + (linearDisplacementCurrent * -0.5477) + (linearVelocityCurrent * -0.3533);
 
 		// Compute velocity command
 		pidPercentage = torqueToSpeed(-motorTorque, inertiaWheel);		//Motor torque should make robot move in the same direction as it is tilting
@@ -138,7 +109,6 @@ task main()
 		 nxtDisplayTextLine(4, " Thetadot: %05.2f ", angleVelocityCurrent);
 		 nxtDisplayTextLine(5, " X: %05.2f ", linearDisplacementCurrent);
 		 nxtDisplayTextLine(6, " Xdot: %05.2f ", linearVelocityCurrent);
-		 nxtDisplayTextLine(7, " Range: %04.3f ", rangeValue);
 
 		wait1Msec(2);
 	}
@@ -164,7 +134,7 @@ void setupDefault (void) {
 	nMotorPIDSpeedCtrl[motorC] = mtrSyncRegSlave;
 
 	//Turn Sensors on (if needed)
-	SetSensorType(S1, sensorSONAR);
+	//SetSensorType(S1, sensorSONAR);
 
 }
 
