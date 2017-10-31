@@ -12,11 +12,14 @@
 #define  MAXSPEED 700
 #define GYROFFSET 595
 
-#define RANGEMAX 28.0
+#define RANGEMAX 25.0
 #define RANGEMAXABS 40.0
 #define RANGEMIN 0.0
-#define RANGEZEROHIGH 21.0
-#define RANGEZEROLOW 12.0
+#define RANGEZEROHIGH 19.0
+#define RANGEZEROLOW 16.0
+
+#define nBar -0.0				// Try -0.1 normally
+#define rangeScale 0.6	//-0.6 normally, 0 for testing
 
 #define  SONAR S1
 #define  GYRO S4
@@ -69,7 +72,6 @@ task main()
 
 	float linearDisplacementPrevious = 0;
 	float linearDisplacementCurrent = 0;
-	float linearBias = 0;
 
 	float linearVelocityPrevious = 0;		//MAY NOT BE NEEDED
 	float linearVelocityCurrent = 0;
@@ -95,28 +97,13 @@ task main()
 		checkSkip = 0;
 
 		// Compute state variables
+		angleVelocityCurrent = SensorValue(S4) - GYROFFSET;
+		angleDisplacementCurrent = angleDisplacementCurrent + (angleVelocityCurrent) * SAMPLEPERIOD;
+
 		encoderValuePrevious = encoderValueCurrent;
 		encoderValueCurrent = encoderValue();
 		linearDisplacementPrevious = linearDisplacementCurrent;
 		linearDisplacementCurrent = linearDisplacementPrevious + ((encoderValueCurrent - encoderValuePrevious) * (PI / 180.0)) * wheelRadius;	// TODO: - pretty sure encoder is an accumilator, may need to double check
-
-		// Try and eliminate linear drift (seems to work)
-		linearBias = linearDisplacementCurrent;
-		if(linearBias < -0.03){
-			linearBias = -0.03;
-		}
-		else if (linearBias > 0.03) {
-			linearBias = 0.03;
-	  }
-
-		angleVelocityCurrent = SensorValue(S4) - GYROFFSET;
-
-		// Try and eliminate angular drift (seems to work)
-		if((angleVelocityCurrent > -3) && (angleVelocityCurrent < 3)){
-			angleVelocityCurrent = 0;
-		}
-
-		angleDisplacementCurrent = (linearBias * 0.1) +  angleDisplacementCurrent + (angleVelocityCurrent) * SAMPLEPERIOD;
 
 		linearVelocityPrevious = linearVelocityCurrent;
 		linearVelocityCurrent = (linearDisplacementCurrent - linearDisplacementPrevious) * CONTROLLERFREQUENCY;
@@ -127,7 +114,7 @@ task main()
 			rangeValue = RANGEMIN;
 		}
 		else if((rangeValue >= RANGEMAX) && (rangeValue < RANGEMAXABS)){
-			rangeValue = 0.6/(rangeValue - RANGEZEROHIGH);
+			rangeValue = 0.4/rangeValue;
 			checkSkip = 1;
 		}
 		else if((rangeValue >= RANGEZEROLOW) && (rangeValue <= RANGEZEROHIGH)){
@@ -143,11 +130,11 @@ task main()
 			rangeValue = (rangeValue - RANGEZEROLOW) / 100;												// Move backward reference in meters
 		}
 
-		linearDisplacementCurrent = linearDisplacementCurrent + (rangeValue * 0.01);
-
 		// Estimate gains & compute control rule K * s
-		motorTorque = (angleDisplacementCurrent * (PI/180) * -1.0573) + (angleVelocityCurrent * (PI/180) *  -0.0495) + (linearDisplacementCurrent * -0.2280) + (linearVelocityCurrent * -0.2449);
-		motorTorque = -motorTorque;
+		motorTorque = (angleDisplacementCurrent * (PI/180) * -1.1573) + (angleVelocityCurrent * (PI/180) *  -0.0495) + (linearDisplacementCurrent * -0.4280) + (linearVelocityCurrent * -0.2449);
+		motorTorque = -motorTorque + (rangeScale * -rangeValue) + (linearDisplacementCurrent * nBar);
+
+
 
 		// Compute velocity command
 		pidPercentage = torqueToSpeed(motorTorque, inertiaWheel);		//Motor torque should make robot move in the same direction as it is tilting
@@ -155,13 +142,13 @@ task main()
 
 		//DEBUG: Display State Variables
 		 //nxtDisplayTextLine(2, " TimeLoop: %d ", (timerloop));
-		 // nxtDisplayTextLine(1, " PID: %05.2f ", pidPercentage);
-		 // nxtDisplayTextLine(2, " Torque: %05.2f ", motorTorque);
-		 // nxtDisplayTextLine(3, " Theta: %05.2f ", angleDisplacementCurrent);
-		 // nxtDisplayTextLine(4, " Thetadot: %05.2f ", angleVelocityCurrent);
-		 // nxtDisplayTextLine(5, " X: %05.2f ", linearDisplacementCurrent);
-		 // nxtDisplayTextLine(6, " Xdot: %05.2f ", linearVelocityCurrent);
-		 // nxtDisplayTextLine(7, " Range: %04.3f ", rangeValue);
+		 //nxtDisplayTextLine(1, " PID: %05.2f ", pidPercentage);
+		 //nxtDisplayTextLine(2, " Torque: %05.2f ", motorTorque);
+		 //nxtDisplayTextLine(3, " Theta: %05.2f ", angleDisplacementCurrent);
+		 //nxtDisplayTextLine(4, " Thetadot: %05.2f ", angleVelocityCurrent);
+		 //nxtDisplayTextLine(5, " X: %05.2f ", linearDisplacementCurrent);
+		 //nxtDisplayTextLine(6, " Xdot: %05.2f ", linearVelocityCurrent);
+		 //nxtDisplayTextLine(7, " Range: %04.3f ", rangeValue);
 
 		wait1Msec(2);
 	}
